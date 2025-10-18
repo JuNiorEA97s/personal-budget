@@ -132,6 +132,7 @@
                     </p>
                     <figcaption id="chart-desc">Visualization of budget categories and their amounts.</figcaption>
                 </figure>
+                <div id="d3chart" role="img" aria-label="Budget by category bar chart"></div>
 
                 <!-- This is an A11y Change -->
                 <noscript>
@@ -148,46 +149,89 @@
             All rights reserved &copy; Fabio Nolasco
         </div>
 </footer>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.20.0/axios.min.js" integrity="sha512-quHCp3WbBNkwLfYUMd+KwBAgpVukJu5MncuQaWXgCrfgcxCJAq/fo+oqrRKOj+UKEmyMCG3tb8RB63W+EmrOBg==" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.min.js" integrity="sha512-s+xg36jbIujB2S2VKfpGmlC3T5V2TF3lY48DX7u2r9XzGzgPsa6wTpOQA7J9iffvdeBN0q9tKzRxVxw1JviZPg==" crossorigin="anonymous"></script>
-
+<script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
-        var dataSource = {
-                datasets: [
-                    {
-                        data: [],
-                        backgroundColor: [
-                            '#ffcd56',
-                            '#ff6384',
-                            '#36a2eb',
-                            '#fd6b19',
-                        ]
-                    }
-                ],
-                labels: []
-            };
+  var dataSource = {
+    datasets: [{
+      data: [],
+      backgroundColor: [
+        '#ffcd56', '#ff6384', '#36a2eb', '#fd6b19', '#4ade80', '#a78bfa', '#f472b6'
+      ]
+    }],
+    labels: []
+  };
 
-        function createChart() {
-            var ctx = document.getElementById('myChart').getContext('2d');
-            var myPieChart = new Chart(ctx, {
-                type: 'pie',
-                data: dataSource
-            });
-        }
+  function createChart() {
+    var ctx = document.getElementById('myChart').getContext('2d');
+    new Chart(ctx, { type: 'pie', data: dataSource });
+  }
 
-        function getBudget() {
-            axios.get('http://localhost:3000/budget')
-            .then(function (res) {
-                for (var i = 0; i < res.data.myBudget.length; i++) {
-                    dataSource.datasets[0].data[i] = res.data.myBudget[i].budget;
-                    dataSource.labels[i] = res.data.myBudget[i].title;
-                    createChart();
-                }
-            });
-        }
+  function renderD3(arr) {
+    var root = document.getElementById('d3chart');
+    root.innerHTML = '';
 
-        getBudget();
+    var width = 560, height = 320;
+    var margin = { top: 20, right: 20, bottom: 60, left: 60 };
+
+    var svg = d3.select('#d3chart').append('svg')
+      .attr('width', width)
+      .attr('height', height);
+
+    var labels = arr.map(function(d){ return d.title; });
+    var values = arr.map(function(d){ return d.budget; });
+
+    var x = d3.scaleBand()
+      .domain(labels)
+      .range([margin.left, width - margin.right])
+      .padding(0.2);
+
+    var y = d3.scaleLinear()
+      .domain([0, d3.max(values)]).nice()
+      .range([height - margin.bottom, margin.top]);
+
+    svg.append('g')
+      .attr('transform', 'translate(0,' + (height - margin.bottom) + ')')
+      .call(d3.axisBottom(x))
+      .selectAll('text')
+      .attr('transform', 'rotate(-30)')
+      .style('text-anchor', 'end');
+
+    svg.append('g')
+      .attr('transform', 'translate(' + margin.left + ',0)')
+      .call(d3.axisLeft(y));
+
+    svg.selectAll('rect')
+      .data(arr)
+      .enter()
+      .append('rect')
+      .attr('x', function(d){ return x(d.title); })
+      .attr('y', function(d){ return y(d.budget); })
+      .attr('width', x.bandwidth())
+      .attr('height', function(d){ return y(0) - y(d.budget); })
+      .append('title')
+      .text(function(d){ return d.title + ': ' + d.budget; });
+  }
+
+  function getBudget() {
+    var host = window.location.hostname;
+    var API = host === 'localhost' ? '/budget' : 'http://206.81.9.135:3000/budget';
+
+    axios.get(API).then(function(res){
+      var arr = res.data.myBudget;
+      arr.forEach(function(item, i){
+        dataSource.datasets[0].data[i] = item.budget;
+        dataSource.labels[i] = item.title;
+      });
+      createChart();
+      renderD3(arr);
+    }).catch(function(err){
+      console.error(err);
+    });
+  }
+
+  getBudget();
 </script>
 
 </body>
